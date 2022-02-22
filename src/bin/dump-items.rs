@@ -61,12 +61,12 @@ fn main() -> eyre::Result<()> {
     for source in args.sources {
         let mut split = source.split(":");
 
-        let name = split.next().unwrap();
+        let dim_name = split.next().unwrap().to_string();
         let opts = parse_opts(split.next());
 
-        match name {
+        match dim_name.as_str() {
             "overworld" | "nether" | "end" => {
-                let dim_path = world_path.join(match name {
+                let dim_path = world_path.join(match dim_name.as_str() {
                     "overworld" => "",
                     "nether" => "DIM-1",
                     "end" => "DIM1",
@@ -74,6 +74,7 @@ fn main() -> eyre::Result<()> {
                 });
 
                 scan_dimension(ScanDimensionOptions {
+                    dim_name,
                     dim_path,
                     entities: parse_list(&args.entities, ENTITY_IDS),
                     block_entities: parse_list(&args.block_entities, BLOCK_ENTITY_IDS),
@@ -106,6 +107,7 @@ fn main() -> eyre::Result<()> {
 
 #[derive(Debug)]
 pub struct ScanDimensionOptions {
+    pub dim_name: String,
     pub dim_path: PathBuf,
     pub entities: HashSet<String>,
     pub block_entities: HashSet<String>,
@@ -113,6 +115,8 @@ pub struct ScanDimensionOptions {
 }
 
 fn scan_dimension(options: ScanDimensionOptions) -> eyre::Result<()> {
+    eprintln!("scanning {}", options.dim_name);
+
     let options = Arc::new(options);
     let region_regex = Regex::new(r"^r\.(-?\d+)\.(-?\d+)\.mca$")?;
     let region_path = options.dim_path.join("region");
@@ -211,18 +215,29 @@ fn scan_dimension(options: ScanDimensionOptions) -> eyre::Result<()> {
 
         eprintln!("processing region {} {}", region_x, region_z);
 
-        let scan_region_file = |is_entity_chunk: bool, path: &Path| {
-            let mut region_file =
-                match RegionFile::new(File::open(path).context("region file not found")?) {
-                    Ok(region_file) => region_file,
-                    Err(e) => match e.kind() {
-                        io::ErrorKind::UnexpectedEof => {
-                            eprintln!("unexpected eof while reading region file");
-                            return Ok(());
-                        }
-                        _ => eyre::bail!(e),
-                    },
-                };
+        let scan_region_file = |is_entity_chunk: bool, path: &Path| -> eyre::Result<()> {
+            let mut region_file = match RegionFile::new(match File::open(path) {
+                Ok(file) => file,
+                Err(e) => match e.kind() {
+                    io::ErrorKind::NotFound => {
+                        eprintln!(
+                            "region file not found {}",
+                            path.strip_prefix(&options.dim_path)?.to_str().unwrap()
+                        );
+                        return Ok(());
+                    }
+                    _ => return Err(e.into()),
+                },
+            }) {
+                Ok(region_file) => region_file,
+                Err(e) => match e.kind() {
+                    io::ErrorKind::UnexpectedEof => {
+                        eprintln!("unexpected eof while reading region file");
+                        return Ok(());
+                    }
+                    _ => return Err(e.into()),
+                },
+            };
 
             region_file.for_each_chunk(|(index, buf)| {
                 let chunk_x = region_x * 32 + (index % 32) as i32;
