@@ -1,0 +1,15 @@
+[package]
+name = "world-statistics"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+eyre = "0.6.6"
+clap = { version = "3.1.1", features = ["derive"] }
+regex = "1.5.4"
+byteorder = "1.4.3"
+thiserror = "1.0.30"
+quartz_nbt = "0.2.5"
+crossbeam-channel = "0.5.2"
