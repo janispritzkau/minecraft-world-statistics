@@ -13,3 +13,5 @@ byteorder = "1.4.3"
 thiserror = "1.0.30"
 quartz_nbt = "0.2.5"
 crossbeam-channel = "0.5.2"
+serde_json = { version = "1.0.79", features = ["preserve_order"] }
+indexmap = { version = "1.8.0", features = ["serde"] }
